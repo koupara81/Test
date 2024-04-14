@@ -1,0 +1,73 @@
+const GEMINI_API = 'AIzaSyDOmsBYM_DyWhvfyUFjJLgWFBoxq4zYgMU';
+const inputSheet = SpreadsheetApp.openById("1P0FA9c1Ydv3Q_2_ixB1t04DYx-8gNM-hCUyLTkiIXG0").getSheetByName("INPUT");
+const sheet = SpreadsheetApp.openById("1P0FA9c1Ydv3Q_2_ixB1t04DYx-8gNM-hCUyLTkiIXG0").getSheetByName("Output");
+
+function getKeywordsFromSheet() {
+  const range = inputSheet.getDataRange();  // データが存在する範囲を取得
+  const values = range.getValues();  // すべてのデータを二次元配列として取得
+  
+  const keywords = [];
+  for (let i = 1; i < values.length; i++) {  // ヘッダー行をスキップ
+    const row = values[i];
+    const id = row[0];  // A列: ID
+    const keyword1 = row[1];  // B列: キーワード1
+    const keyword2 = row[2];  // C列: キーワード2
+    keywords.push({ id, keyword1, keyword2 });
+  }
+  return keywords;
+}
+
+
+
+function gaslog_GeminiPro() {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API}`
+        , payload = {
+            'contents': [
+              {
+                'parts': [{
+                  //質問内容を記入。
+                   'text': 'Google スプレッドシートのキーワードに基づいてブログ記事のアウトラインを作成して。キーワード1:「カスタマージャーニー」、キーワード2:「デジタルマーケティング」'
+                }]
+              }
+            ]
+          }
+        , options = {
+            'method': 'post',
+            'contentType': 'application/json',
+            'payload': JSON.stringify(payload)
+          };
+
+const res = UrlFetchApp.fetch(url, options);
+  if (res.getResponseCode() !== 200) {
+    console.error('API call failed with response: ' + res.getContentText());
+    return null;  // エラー時はnullを返す
+  }
+
+  const resJson = JSON.parse(res.getContentText());
+  console.log(JSON.stringify(resJson));
+  return resJson;
+}
+
+
+function writeDataToSheet(data) {
+  if (!data || !data.candidates || data.candidates.length === 0) {
+    console.error('No data to write to sheet.');
+    return;  // データがなければ処理を中断
+  }
+  
+  // `data.candidates[0].content.parts`からテキストを取り出して書き込む
+  const contentParts = data.candidates[0].content.parts;
+  sheet.clear();  // 古いデータをクリア
+  sheet.appendRow(["Generated Content"]);  // タイトル行を追加
+  
+  contentParts.forEach(part => {
+    sheet.appendRow([part.text]);  // 各パートのテキストをシートに追加
+  });
+}
+
+
+
+function main() {
+  const data = gaslog_GeminiPro();  // APIからデータを取得
+  writeDataToSheet(data);  // データをシートに書き込む
+}
